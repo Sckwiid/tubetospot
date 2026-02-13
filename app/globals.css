@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: radial-gradient(circle at 20% 20%, rgba(43, 104, 249, 0.12), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(26, 188, 156, 0.12), transparent 22%),
+    #05060a;
+}
+
+html, body {
+  background: var(--bg);
+  color: #f8fafc;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sg), 'Inter', system-ui, -apple-system, sans-serif;
+  @apply antialiased;
+}
+
+.glass {
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-border {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+input::placeholder {
+  color: rgba(248, 250, 252, 0.55);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
