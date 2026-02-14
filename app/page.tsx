@@ -44,6 +44,7 @@ export default function HomePage() {
       e.preventDefault();
       const url = playlistUrl.trim();
       if (!url) return;
+      const activeTab = mode;
 
       setLoading(true);
       setStatus('Initialisation…');
@@ -61,7 +62,7 @@ export default function HomePage() {
         const res = await fetch('/api/convert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playlistUrl: url, mode }),
+          body: JSON.stringify({ playlistUrl: url, mode: activeTab }),
           signal: controller.signal
         });
 

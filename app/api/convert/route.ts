@@ -10,9 +10,10 @@ const jsonError = (message: string, status = 400) => NextResponse.json({ error: 
 
 export async function POST(req: NextRequest) {
   try {
-    const { playlistUrl, mode: rawMode } = await req.json();
-    const mode: 'spotify-to-youtube' | 'youtube-to-spotify' =
-      rawMode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
+    const { playlistUrl, mode } = await req.json();
+    console.log('Incoming request:', { playlistUrl, mode });
+    const normalizedMode: 'spotify-to-youtube' | 'youtube-to-spotify' =
+      mode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
     const url = typeof playlistUrl === 'string' ? playlistUrl.trim() : '';
 
     if (!url) return jsonError('Merci de fournir une URL de playlist.');
@@ -25,10 +26,10 @@ export async function POST(req: NextRequest) {
     if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
       const tokenConfig = {
         spotify: {
-          client_id: process.env.SPOTIFY_CLIENT_ID,
-          client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+          client_id: process.env.SPOTIFY_CLIENT_ID!,
+          client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
           refresh_token: '',
-          market: 'US'
+          market: 'FR'
         }
       };
       try {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Branch A: Spotify -> YouTube
-    if (mode === 'spotify-to-youtube') {
+    if (normalizedMode === 'spotify-to-youtube') {
       if (!cleanUrl.includes('spotify.com/playlist')) {
         return jsonError('Veuillez fournir une URL de playlist Spotify publique valide.');
       }
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
               encoder.encode(
                 JSON.stringify({
                   type: 'progress',
-                  mode,
+                  mode: normalizedMode,
                   current: i + 1,
                   total,
                   track: title,
@@ -128,7 +129,8 @@ export async function POST(req: NextRequest) {
 
           controller.enqueue(
             encoder.encode(
-              JSON.stringify({ type: 'done', mode, playlistUrl: playlistLink, total, found: ids.length }) + '\n'
+              JSON.stringify({ type: 'done', mode: normalizedMode, playlistUrl: playlistLink, total, found: ids.length }) +
+                '\n'
             )
           );
           controller.close();
@@ -176,7 +178,7 @@ export async function POST(req: NextRequest) {
             encoder.encode(
               JSON.stringify({
                 type: 'progress',
-                mode,
+                mode: normalizedMode,
                 current: i + 1,
                 total,
                 track: title,
@@ -190,7 +192,7 @@ export async function POST(req: NextRequest) {
           encoder.encode(
             JSON.stringify({
               type: 'done',
-              mode,
+              mode: normalizedMode,
               total,
               found: searches.length,
               spotifySearches: searches
