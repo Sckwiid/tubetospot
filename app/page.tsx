@@ -39,7 +39,7 @@ export default function HomePage() {
     return Math.min(100, Math.round((current / total) * 100));
   }, [current, total]);
 
-  const handleSubmit = useCallback(
+  const handleConvert = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!playlistUrl.trim()) return;
@@ -171,7 +171,7 @@ export default function HomePage() {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
+          <form onSubmit={handleConvert} className="flex flex-col md:flex-row gap-3 md:gap-4">
             <input
               type="url"
               required
