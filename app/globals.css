@@ -7,6 +7,7 @@
   --bg: radial-gradient(circle at 20% 20%, rgba(43, 104, 249, 0.12), transparent 25%),
     radial-gradient(circle at 80% 0%, rgba(26, 188, 156, 0.12), transparent 22%),
     #05060a;
+  --font-sg: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 html, body {

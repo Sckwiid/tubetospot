@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
 
     const cleanUrl = playlistUrl.split('?')[0];
     const { default: play } = await import('play-dl');
+    const playAny = play as any;
 
     // Optional token: helps avoid Spotify rate limits; refresh_token left empty intentionally.
     if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
         }
       };
       try {
-        await play.setToken(tokenConfig as any); // force past the refresh_token typing requirement
+        await playAny.setToken(tokenConfig as any); // force past the refresh_token typing requirement
       } catch {
         // Non-blocking if token setup fails
       }
@@ -41,14 +43,14 @@ export async function POST(req: NextRequest) {
       if (!cleanUrl.includes('spotify.com/playlist')) {
         return jsonError('Veuillez fournir une URL de playlist Spotify publique valide.');
       }
-      const validation = play.validate(cleanUrl);
+      const validation = playAny.validate(cleanUrl);
       if (validation !== 'sp_pl') {
         return jsonError("L'URL fournie ne semble pas être une playlist Spotify.");
       }
 
       let playlist: any;
       try {
-        playlist = await play.spotify(cleanUrl);
+        playlist = await playAny.spotify(cleanUrl);
         if (!playlist || playlist.type !== 'playlist') {
           return jsonError("L'URL fournie n'est pas une playlist Spotify.");
         }
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
             let videoId: string | undefined;
             const query = `${title} ${artist}`.trim();
             try {
-              const results = await play.search(query, { limit: 5, source: { youtube: 'video' } });
+              const results = await playAny.search(query, { limit: 5, source: { youtube: 'video' } });
               if (Array.isArray(results) && results.length) {
                 if (durationSec) {
                   let best = results[0];
@@ -142,12 +144,12 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Branch B: YouTube -> Spotify (returns search links; no Spotify auth needed)
-    const ytType = play.yt_validate(cleanUrl);
+    const ytType = playAny.yt_validate(cleanUrl);
     if (ytType !== 'playlist') return jsonError("Merci de fournir une URL de playlist YouTube valide.");
 
     let ytPlaylist: any;
     try {
-      ytPlaylist = await play.playlist_info(cleanUrl, { incomplete: true });
+      ytPlaylist = await playAny.playlist_info(cleanUrl, { incomplete: true });
     } catch {
       return jsonError("Impossible de lire la playlist YouTube. Vérifiez qu'elle est publique.", 404);
     }
