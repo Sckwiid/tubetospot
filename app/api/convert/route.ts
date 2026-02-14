@@ -24,6 +24,22 @@ export async function POST(req: NextRequest) {
 
     const { default: play } = await import('play-dl');
 
+    // Optional token to reduce rate limits on Spotify; refresh_token left empty on purpose
+    if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+      try {
+        await play.setToken({
+          spotify: {
+            client_id: process.env.SPOTIFY_CLIENT_ID,
+            client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+            refresh_token: '',
+            market: 'US'
+          } as any
+        });
+      } catch {
+        // non-blocking
+      }
+    }
+
     // --- Branch: Spotify -> YouTube
     if (mode === 'spotify-to-youtube') {
       if (!cleanUrl.includes('spotify.com/playlist')) {
