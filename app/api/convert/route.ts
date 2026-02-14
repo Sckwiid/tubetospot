@@ -3,11 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const textEncoder = new TextEncoder();
+const encoder = new TextEncoder();
 
-function createError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+const jsonError = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,62 +14,59 @@ export async function POST(req: NextRequest) {
       body.mode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
     const playlistUrl = typeof body.playlistUrl === 'string' ? body.playlistUrl.trim() : '';
 
-    if (!playlistUrl) {
-      return createError("Merci de fournir une URL de playlist.");
-    }
+    if (!playlistUrl) return jsonError('Merci de fournir une URL de playlist.');
 
     const cleanUrl = playlistUrl.split('?')[0];
-
     const { default: play } = await import('play-dl');
 
-    // Optional token to reduce rate limits on Spotify; refresh_token left empty on purpose
-await play.setToken({
-  spotify: {
-    client_id: process.env.SPOTIFY_CLIENT_ID!,
-    client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
-    refresh_token: '', // On met une chaîne vide pour satisfaire le type
-    market: 'US'
-  } as any // Ce "as any" est la clé pour ignorer l'erreur TypeScript
-});
+    // Optional token: helps avoid Spotify rate limits; refresh_token left empty intentionally.
+    if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+      const tokenConfig = {
+        spotify: {
+          client_id: process.env.SPOTIFY_CLIENT_ID,
+          client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+          refresh_token: '',
+          market: 'US'
+        }
+      };
+      try {
+        await play.setToken(tokenConfig as any); // force past the refresh_token typing requirement
+      } catch {
+        // Non-blocking if token setup fails
+      }
+    }
 
-    // --- Branch: Spotify -> YouTube
+    // --- Branch A: Spotify -> YouTube
     if (mode === 'spotify-to-youtube') {
       if (!cleanUrl.includes('spotify.com/playlist')) {
-        return createError('Veuillez fournir une URL de playlist Spotify publique valide.');
+        return jsonError('Veuillez fournir une URL de playlist Spotify publique valide.');
       }
-
       const validation = play.validate(cleanUrl);
       if (validation !== 'sp_pl') {
-        return createError("L'URL fournie ne semble pas être une playlist Spotify.");
+        return jsonError("L'URL fournie ne semble pas être une playlist Spotify.");
       }
 
-      // Validate and fetch playlist metadata
       let playlist: any;
       try {
         playlist = await play.spotify(cleanUrl);
         if (!playlist || playlist.type !== 'playlist') {
-          return createError("L'URL fournie n'est pas une playlist Spotify.");
+          return jsonError("L'URL fournie n'est pas une playlist Spotify.");
         }
-        if (typeof playlist.fetch === 'function') {
-          await playlist.fetch();
-        }
-      } catch (err: any) {
-        return createError(
+        if (typeof playlist.fetch === 'function') await playlist.fetch();
+      } catch {
+        return jsonError(
           "Impossible de lire la playlist. Assurez-vous qu'elle est publique et réessayez dans quelques instants.",
           404
         );
       }
 
-      // Resolve tracks array from play-dl object
       const tracks: any[] = Array.isArray(playlist.tracks)
         ? playlist.tracks
         : typeof playlist.all_tracks === 'function'
         ? await playlist.all_tracks()
         : [];
 
-      if (!tracks.length) {
-        return createError('Aucune piste trouvée dans cette playlist.');
-      }
+      if (!tracks.length) return jsonError('Aucune piste trouvée dans cette playlist.');
 
       const ids: string[] = [];
       const total = tracks.length;
@@ -84,13 +79,11 @@ await play.setToken({
             const artist = Array.isArray(track?.artists) && track.artists[0]?.name ? track.artists[0].name : '';
             const durationSec = typeof track?.durationInMs === 'number' ? track.durationInMs / 1000 : undefined;
 
-            const query = `${title} ${artist}`.trim();
             let videoId: string | undefined;
-
+            const query = `${title} ${artist}`.trim();
             try {
               const results = await play.search(query, { limit: 5, source: { youtube: 'video' } });
               if (Array.isArray(results) && results.length) {
-                // Simple duration-aware selection
                 if (durationSec) {
                   let best = results[0];
                   let bestDelta = Math.abs((best.durationInSec || 0) - durationSec);
@@ -106,16 +99,14 @@ await play.setToken({
                   videoId = results[0].id;
                 }
               }
-            } catch (err) {
-              // Swallow search errors for individual tracks
+            } catch {
+              // ignore per-track search errors
             }
 
-            if (videoId) {
-              ids.push(videoId);
-            }
+            if (videoId) ids.push(videoId);
 
             controller.enqueue(
-              textEncoder.encode(
+              encoder.encode(
                 JSON.stringify({
                   type: 'progress',
                   mode,
@@ -134,7 +125,7 @@ await play.setToken({
             : null;
 
           controller.enqueue(
-            textEncoder.encode(
+            encoder.encode(
               JSON.stringify({ type: 'done', mode, playlistUrl: playlistLink, total, found: ids.length }) + '\n'
             )
           );
@@ -150,23 +141,19 @@ await play.setToken({
       });
     }
 
-    // --- Branch: YouTube -> Spotify (returns search links; no auth needed)
+    // --- Branch B: YouTube -> Spotify (returns search links; no Spotify auth needed)
     const ytType = play.yt_validate(cleanUrl);
-    if (ytType !== 'playlist') {
-      return createError("Merci de fournir une URL de playlist YouTube valide.");
-    }
+    if (ytType !== 'playlist') return jsonError("Merci de fournir une URL de playlist YouTube valide.");
 
     let ytPlaylist: any;
     try {
       ytPlaylist = await play.playlist_info(cleanUrl, { incomplete: true });
-    } catch (err) {
-      return createError("Impossible de lire la playlist YouTube. Vérifiez qu'elle est publique.", 404);
+    } catch {
+      return jsonError("Impossible de lire la playlist YouTube. Vérifiez qu'elle est publique.", 404);
     }
 
     const videos = typeof ytPlaylist.all_videos === 'function' ? await ytPlaylist.all_videos() : ytPlaylist.videos || [];
-    if (!Array.isArray(videos) || videos.length === 0) {
-      return createError("Aucune vidéo trouvée dans cette playlist YouTube.");
-    }
+    if (!Array.isArray(videos) || videos.length === 0) return jsonError('Aucune vidéo trouvée dans cette playlist YouTube.');
 
     const total = videos.length;
     const searches: { title: string; query: string; searchUrl: string; durationSec?: number }[] = [];
@@ -177,7 +164,6 @@ await play.setToken({
           const video = videos[i];
           const title = video?.title || 'Unknown';
           const durationSec = video?.durationInSec;
-          // Try to split artist - title if formatted that way
           const [maybeArtist, maybeTitle] = title.split(' - ');
           const query = maybeTitle ? `${maybeArtist} ${maybeTitle}` : title;
           const searchUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
@@ -185,7 +171,7 @@ await play.setToken({
           searches.push({ title, query, searchUrl, durationSec });
 
           controller.enqueue(
-            textEncoder.encode(
+            encoder.encode(
               JSON.stringify({
                 type: 'progress',
                 mode,
@@ -199,7 +185,7 @@ await play.setToken({
         }
 
         controller.enqueue(
-          textEncoder.encode(
+          encoder.encode(
             JSON.stringify({
               type: 'done',
               mode,
@@ -220,6 +206,6 @@ await play.setToken({
       }
     });
   } catch (err) {
-    return createError('Erreur serveur inattendue.', 500);
+    return jsonError('Erreur serveur inattendue.', 500);
   }
 }

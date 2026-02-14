@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Supprime tout ce qui est "experimental" ici
-};
+const nextConfig = {};
 
 module.exports = nextConfig;
