@@ -25,20 +25,14 @@ export async function POST(req: NextRequest) {
     const { default: play } = await import('play-dl');
 
     // Optional token to reduce rate limits on Spotify; refresh_token left empty on purpose
-    if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-      try {
-        await play.setToken({
-          spotify: {
-            client_id: process.env.SPOTIFY_CLIENT_ID,
-            client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-            refresh_token: '',
-            market: 'US'
-          } as any
-        });
-      } catch {
-        // non-blocking
-      }
-    }
+await play.setToken({
+  spotify: {
+    client_id: process.env.SPOTIFY_CLIENT_ID!,
+    client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
+    refresh_token: '', // On met une chaîne vide pour satisfaire le type
+    market: 'US'
+  } as any // Ce "as any" est la clé pour ignorer l'erreur TypeScript
+});
 
     // --- Branch: Spotify -> YouTube
     if (mode === 'spotify-to-youtube') {
