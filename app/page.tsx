@@ -1,10 +1,13 @@
 'use client';
 
 import { FormEvent, useCallback, useMemo, useRef, useState } from 'react';
-import { Ghost, Music2, Sparkles, Youtube } from 'lucide-react';
+import { Ghost, Music2, Sparkles, Youtube, ArrowLeftRight } from 'lucide-react';
+
+type Mode = 'spotify-to-youtube' | 'youtube-to-spotify';
 
 interface ProgressEvent {
   type: 'progress' | 'done';
+  mode?: Mode;
   current?: number;
   total?: number;
   track?: string;
@@ -13,10 +16,12 @@ interface ProgressEvent {
   playlistUrl?: string | null;
   found?: number;
   error?: string;
+  spotifySearches?: { title: string; query: string; searchUrl: string; durationSec?: number }[];
 }
 
 export default function HomePage() {
   const [playlistUrl, setPlaylistUrl] = useState('');
+  const [mode, setMode] = useState<Mode>('spotify-to-youtube');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
@@ -24,6 +29,9 @@ export default function HomePage() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [found, setFound] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
+  const [spotifyLinks, setSpotifyLinks] = useState<
+    { title: string; query: string; searchUrl: string; durationSec?: number }[]
+  >([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const progress = useMemo(() => {
@@ -43,6 +51,7 @@ export default function HomePage() {
       setResultUrl(null);
       setFound(0);
       setHistory([]);
+      setSpotifyLinks([]);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -51,7 +60,7 @@ export default function HomePage() {
         const res = await fetch('/api/convert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playlistUrl }),
+          body: JSON.stringify({ playlistUrl, mode }),
           signal: controller.signal
         });
 
@@ -89,6 +98,9 @@ export default function HomePage() {
             if (evt.type === 'done') {
               setResultUrl(evt.playlistUrl || null);
               setFound(evt.found || 0);
+              if (evt.spotifySearches) {
+                setSpotifyLinks(evt.spotifySearches);
+              }
             }
           }
         }
@@ -101,7 +113,7 @@ export default function HomePage() {
         abortRef.current = null;
       }
     },
-    [playlistUrl]
+    [playlistUrl, mode]
   );
 
   const handleAbort = useCallback(() => {
@@ -119,10 +131,10 @@ export default function HomePage() {
             <span className="uppercase tracking-[0.3em] text-sm font-semibold">GhostDL</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-semibold text-white leading-tight">
-            Transforme ta playlist Spotify en playlist YouTube <span className="text-brand-400">anonyme</span>
+            Transforme ta playlist <span className="text-brand-400">Spotify ↔ YouTube</span> en un clic
           </h1>
           <p className="text-slate-300 max-w-2xl mx-auto">
-            Colle simplement une URL de playlist Spotify publique. Nous trouvons les correspondances sur YouTube et générons un lien prêt à ouvrir.
+            Colle simplement une URL de playlist publique. Nous trouvons les correspondances et générons un lien ou des recherches prêtes à ouvrir.
           </p>
           <div className="flex items-center justify-center gap-3 text-sm text-slate-400">
             <div className="flex items-center gap-2"><Music2 className="w-4 h-4" />Sans connexion Spotify</div>
@@ -131,12 +143,43 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="glass card-border p-6 md:p-8 rounded-3xl shadow-xl">
+        <section className="glass card-border p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+          <div className="flex items-center gap-3 text-sm bg-white/5 border border-white/10 rounded-2xl p-2 w-full">
+            <button
+              type="button"
+              onClick={() => setMode('spotify-to-youtube')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition ${
+                mode === 'spotify-to-youtube'
+                  ? 'bg-brand-500 text-white shadow-lg'
+                  : 'bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              Spotify → YouTube
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('youtube-to-spotify')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition ${
+                mode === 'youtube-to-spotify'
+                  ? 'bg-brand-500 text-white shadow-lg'
+                  : 'bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <ArrowLeftRight className="w-4 h-4 rotate-180" />
+              YouTube → Spotify
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
             <input
               type="url"
               required
-              placeholder="https://open.spotify.com/playlist/…"
+              placeholder={
+                mode === 'spotify-to-youtube'
+                  ? 'https://open.spotify.com/playlist/…'
+                  : 'https://www.youtube.com/playlist?list=…'
+              }
               value={playlistUrl}
               onChange={(e) => setPlaylistUrl(e.target.value)}
               className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/40 outline-none text-white"
@@ -171,7 +214,9 @@ export default function HomePage() {
             <div className="flex items-center justify-between text-sm text-slate-300">
               <span>{status || 'En attente d’une URL…'}</span>
               {total > 0 && (
-                <span className="text-slate-400">{current}/{total} pistes</span>
+                <span className="text-slate-400">
+                  {current}/{total} {mode === 'spotify-to-youtube' ? 'pistes' : 'vidéos'}
+                </span>
               )}
             </div>
             {history.length > 0 && (
@@ -183,7 +228,7 @@ export default function HomePage() {
             )}
           </div>
 
-          {resultUrl && (
+          {mode === 'spotify-to-youtube' && resultUrl && (
             <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
                 <p className="text-sm">Playlist prête !</p>
@@ -197,6 +242,52 @@ export default function HomePage() {
               >
                 Ouvrir sur YouTube
               </a>
+            </div>
+          )}
+
+          {mode === 'youtube-to-spotify' && spotifyLinks.length > 0 && (
+            <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-50 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="text-sm">Recherche Spotify prête</p>
+                  <p className="font-semibold">{spotifyLinks.length} titres détectés</p>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={spotifyLinks[0].searchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-400 text-emerald-950 font-semibold hover:bg-emerald-300 transition"
+                  >
+                    Ouvrir la 1ʳᵉ recherche
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigator.clipboard.writeText(spotifyLinks.map((l) => l.searchUrl).join('\\n'))
+                    }
+                    className="px-3 py-2 rounded-xl border border-emerald-300/40 text-emerald-50 hover:bg-emerald-400/10 transition"
+                  >
+                    Copier toutes les recherches
+                  </button>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-2 max-h-64 overflow-auto pr-1">
+                {spotifyLinks.slice(0, 12).map((link, idx) => (
+                  <a
+                    key={idx}
+                    href={link.searchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm text-white transition truncate"
+                  >
+                    {idx + 1}. {link.title}
+                  </a>
+                ))}
+              </div>
+              {spotifyLinks.length > 12 && (
+                <p className="text-xs text-emerald-200">Liste tronquée à 12 liens ci-dessus, mais tous sont copiables.</p>
+              )}
             </div>
           )}
         </section>
