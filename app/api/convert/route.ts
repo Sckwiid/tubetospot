@@ -12,13 +12,21 @@ export async function POST(req: NextRequest) {
   try {
     const { playlistUrl, mode } = await req.json();
     console.log('Incoming request:', { playlistUrl, mode });
-    const normalizedMode: 'spotify-to-youtube' | 'youtube-to-spotify' =
+    let normalizedMode: 'spotify-to-youtube' | 'youtube-to-spotify' =
       mode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
     const url = typeof playlistUrl === 'string' ? playlistUrl.trim() : '';
 
     if (!url) return jsonError('Merci de fournir une URL de playlist.');
 
-    const cleanUrl = url.split('?')[0];
+    const cleanUrl = url.split('#')[0];
+
+    // Auto-detect mode from URL to avoid 400 when the toggle isn't synced
+    if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
+      normalizedMode = 'youtube-to-spotify';
+    }
+    if (cleanUrl.includes('spotify.com/playlist')) {
+      normalizedMode = 'spotify-to-youtube';
+    }
     const { default: play } = await import('play-dl');
     const playAny = play as any;
 
@@ -146,12 +154,18 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Branch B: YouTube -> Spotify (returns search links; no Spotify auth needed)
-    const ytType = playAny.yt_validate(cleanUrl);
+    const listMatch = cleanUrl.match(/[?&]list=([^&#]+)/);
+    const normalizedYtUrl =
+      normalizedMode === 'youtube-to-spotify' && listMatch
+        ? `https://www.youtube.com/playlist?list=${listMatch[1]}`
+        : cleanUrl;
+
+    const ytType = playAny.yt_validate(normalizedYtUrl);
     if (ytType !== 'playlist') return jsonError("Merci de fournir une URL de playlist YouTube valide.");
 
     let ytPlaylist: any;
     try {
-      ytPlaylist = await playAny.playlist_info(cleanUrl, { incomplete: true });
+      ytPlaylist = await playAny.playlist_info(normalizedYtUrl, { incomplete: true });
     } catch {
       return jsonError("Impossible de lire la playlist YouTube. Vérifiez qu'elle est publique.", 404);
     }
