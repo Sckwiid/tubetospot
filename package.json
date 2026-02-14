@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "lucide-react": "^0.321.0",
-    "next": "^14.1.0",
+    "next": "14.2.5",
     "play-dl": "^1.9.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -24,6 +24,6 @@
     "eslint-config-next": "^14.1.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.3.3"
+    "typescript": "5.4.5"
   }
 }
