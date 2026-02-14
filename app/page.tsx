@@ -60,7 +60,7 @@ export default function HomePage() {
         const res = await fetch('/api/convert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playlistUrl, mode }),
+          body: JSON.stringify({ playlistUrl: playlistUrl, mode }),
           signal: controller.signal
         });
 
