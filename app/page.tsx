@@ -42,7 +42,8 @@ export default function HomePage() {
   const handleConvert = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      if (!playlistUrl.trim()) return;
+      const url = playlistUrl.trim();
+      if (!url) return;
 
       setLoading(true);
       setStatus('Initialisation…');
@@ -60,7 +61,7 @@ export default function HomePage() {
         const res = await fetch('/api/convert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playlistUrl: playlistUrl, mode }),
+          body: JSON.stringify({ playlistUrl: url, mode }),
           signal: controller.signal
         });
 

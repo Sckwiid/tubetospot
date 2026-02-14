@@ -10,14 +10,14 @@ const jsonError = (message: string, status = 400) => NextResponse.json({ error: 
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
+    const { playlistUrl, mode: rawMode } = await req.json();
     const mode: 'spotify-to-youtube' | 'youtube-to-spotify' =
-      body.mode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
-    const playlistUrl = typeof body.playlistUrl === 'string' ? body.playlistUrl.trim() : '';
+      rawMode === 'youtube-to-spotify' ? 'youtube-to-spotify' : 'spotify-to-youtube';
+    const url = typeof playlistUrl === 'string' ? playlistUrl.trim() : '';
 
-    if (!playlistUrl) return jsonError('Merci de fournir une URL de playlist.');
+    if (!url) return jsonError('Merci de fournir une URL de playlist.');
 
-    const cleanUrl = playlistUrl.split('?')[0];
+    const cleanUrl = url.split('?')[0];
     const { default: play } = await import('play-dl');
     const playAny = play as any;
 
